@@ -1,47 +1,76 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import {
-  Card,
-  CardContent,
-  FormControl,
   MenuItem,
-  Select
+  FormControl,
+  Select,
+  Card,
+  CardContent
 } from '@material-ui/core';
 import InfoBox from './InfoBox';
+import LineGraph from './LineGraph';
+import Table from './Table';
+import { sortData, prettyPrintStat } from './util';
+import numeral from 'numeral';
+import Map from './Map';
+import 'leaflet/dist/leaflet.css';
 
-function App() {
+const App = () => {
+  const [country, setInputCountry] = useState('worldwide');
+  const [countryInfo, setCountryInfo] = useState({});
   const [countries, setCountries] = useState([]);
-  const [country, setCountry] = useState('worldwide');
-  const [countryInfo, setCountryInfo] = useState('');
+  const [mapCountries, setMapCountries] = useState([]);
+  const [tableData, setTableData] = useState([]);
+  const [casesType, setCasesType] = useState('cases');
+  const [mapCenter, setMapCenter] = useState({ lat: 34.80746, lng: -40.4796 });
+  const [mapZoom, setMapZoom] = useState(3);
+
+  useEffect(() => {
+    fetch('https://disease.sh/v3/covid-19/all')
+      .then((response) => response.json())
+      .then((data) => {
+        setCountryInfo(data);
+      });
+  }, []);
 
   useEffect(() => {
     const getCountriesData = async () => {
-      await fetch('https://disease.sh/v3/covid-19/countries')
-        .then((reponse) => reponse.json())
+      fetch('https://disease.sh/v3/covid-19/countries')
+        .then((response) => response.json())
         .then((data) => {
           const countries = data.map((country) => ({
             name: country.country,
             value: country.countryInfo.iso2
           }));
+          let sortedData = sortData(data);
           setCountries(countries);
+          setMapCountries(data);
+          setTableData(sortedData);
         });
     };
+
     getCountriesData();
   }, []);
 
-  const onCountryChange = async (event) => {
-    const countryCode = event.target.value;
-    setCountry(countryCode);
+  console.log(casesType);
+
+  const onCountryChange = async (e) => {
+    const countryCode = e.target.value;
 
     const url =
       countryCode === 'worldwide'
-        ? 'https://disease.sh/v3/covid-19/countries/all'
+        ? 'https://disease.sh/v3/covid-19/all'
         : `https://disease.sh/v3/covid-19/countries/${countryCode}`;
     await fetch(url)
-      .then((reponse) => reponse.json())
-      .then((data) => setCountryInfo(data));
+      .then((response) => response.json())
+      .then((data) => {
+        setInputCountry(countryCode);
+        setCountryInfo(data);
+        setMapCenter([data.countryInfo.lat, data.countryInfo.long]);
+        setMapZoom(4);
+      });
   };
-  console.log(countryInfo);
+
   return (
     <div className="App">
       <div className="app__left">
@@ -77,15 +106,18 @@ function App() {
             total={countryInfo.cases}
           />
         </div>
+        <Map center={mapCenter} zoom={mapZoom} countries={mapCountries} />
       </div>
       <Card className="app__right">
         <CardContent>
           <h3>Live Cases by country</h3>
+          <Table countries={tableData} />
           <h3>Worldwide new cases</h3>
+          <LineGraph casesType={casesType} />
         </CardContent>
       </Card>
     </div>
   );
-}
+};
 
 export default App;
